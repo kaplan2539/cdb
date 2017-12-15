@@ -20,7 +20,11 @@ package libcdb
 
 
 import (
-	"fmt"
+	"os"
+	"log"
+	"net"
+	"errors"
+	"strings"
 )
 
 
@@ -54,8 +58,8 @@ func EnsureIp() error {
 			switch v := addr.(type) {
 			case *net.IPNet:
 				localIP = v.IP
-				log.Debugf("Found IP: %s", localIP.String())
-				log.Debugf("Searching for: %s", hostIp)
+				log.Printf("Found IP: %s", localIP.String())
+				log.Printf("Searching for: %s", hostIp)
 				if localIP.String() == hostIp {
 					return nil
 				}

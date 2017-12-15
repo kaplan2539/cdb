@@ -6,5 +6,5 @@ import (
 
 func main() {
 
-    fmt.Printf("cdb-cli [NOT IMPLEMENTED YET]")
+    fmt.Printf("cdb-cli [NOT IMPLEMENTED YET]\n\n")
 }

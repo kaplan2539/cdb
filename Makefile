@@ -19,10 +19,16 @@ DEPENDS=\
 ## likely to be updated. Neither has tags, and thus, gopkg.in links aren't
 ## being used.
 
+all: cdb cdbd
+
 cdb: libcdb $(CDB_CLI_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-cli"
+	@mkdir -p build/linux_arm
+	@mkdir -p build/linux_arm64
+	@mkdir -p build/linux_amd64
 	@GOOS=linux GOARCH=arm   go build -o build/linux_arm/cdb -ldflags="-s -w" -v ./cdb-cli
-	@GOOS=linux GOARCH=armhf go build -o build/linux_aarch64/cdb -ldflags="-s -w" -v ./cdb-cli
+	@GOOS=linux GOARCH=arm64 go build -o build/linux_arm64/cdb -ldflags="-s -w" -v ./cdb-cli
+	@GOOS=linux GOARCH=amd64 go build -o build/linux_amd64/cdb -ldflags="-s -w" -v ./cdb-cli
 
 $(VERSION_FILE):
 	@echo "package libcdb" > $(VERSION_FILE)
@@ -38,8 +44,10 @@ cdbd: libcdb $(CDB_DAEMON_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-daaemon"
 	@mkdir -p build/linux_arm
 	@mkdir -p build/linux_arm64
+	@mkdir -p build/linux_amd64
 	@GOOS=linux GOARCH=arm   go build -o build/linux_arm/cdbd -ldflags="-s -w" ./cdb-daemon
 	@GOOS=linux GOARCH=arm64 go build -o build/linux_arm64/cdbd -ldflags="-s -w" ./cdb-daemon
+	@GOOS=linux GOARCH=amd64 go build -o build/linux_amd64/cdbd -ldflags="-s -w" ./cdb-daemon
 
 libcdb: $(VERSION_FILE)
 	@echo "Building libcdb"
@@ -55,7 +63,7 @@ tidy:
 
 clean:
 	@echo "Cleaning"
-	@rm -rf build/ cdb $(VERSION_FILE)
+	@rm -rf build/ $(VERSION_FILE)
 
 test: $(CDB_CLI_SOURCES) $(CDB_CLI_SOURCES)
 	@echo "Testing CDB"
