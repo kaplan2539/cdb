@@ -8,13 +8,15 @@ GOPATH?=$(shell go env GOPATH)
 GOOS?=linux
 GOARCH?=$(shell uname -m)
 
-ifeq ($(GOARCH),x86_64))
-	GOARCH=amd64
+ifeq ($(GOARCH),x86_64)
+GOARCH=amd64
 endif
-ifeq ($(GOARCH),aarch64))
-	GOARCH=arm64
+ifeq ($(GOARCH),aarch64)
+GOARCH=arm64
 endif
-
+ifeq ($(GOARCH),armhf)
+GOARCH=arm
+endif
 
 CDB_CLI_SOURCES=$(shell ls cdb-cli/*.go)
 CDB_DAEMON_SOURCES=$(shell ls cdb-daemon/*.go)
