@@ -1,12 +1,20 @@
 VERSION="0.0"
-GIT_COMMIT=$(shell git rev-parse --short HEAD)
-GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+GIT_COMMIT?=$(shell git rev-parse --short HEAD )
+GIT_BRANCH?=$(shell git rev-parse --abbrev-ref HEAD)
 BUILD_DATE=$(shell date --iso-8601)
 VERSION_FILE=libcdb/version.go
 
-## This is an arbitrary comment to arbitrarily change the commit hash
-
 GOPATH?=$(shell go env GOPATH)
+GOOS?=linux
+GOARCH?=$(shell uname -m)
+
+ifeq ($(GOARCH),x86_64))
+	GOARCH=amd64
+endif
+ifeq ($(GOARCH),aarch64))
+	GOARCH=arm64
+endif
+
 
 CDB_CLI_SOURCES=$(shell ls cdb-cli/*.go)
 CDB_DAEMON_SOURCES=$(shell ls cdb-daemon/*.go)
@@ -23,12 +31,8 @@ all: cdb cdbd
 
 cdb: libcdb $(CDB_CLI_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-cli"
-	@mkdir -p build/linux_arm
-	@mkdir -p build/linux_arm64
-	@mkdir -p build/linux_amd64
-	@GOOS=linux GOARCH=arm   go build -o build/linux_arm/cdb -ldflags="-s -w" -v ./cdb-cli
-	@GOOS=linux GOARCH=arm64 go build -o build/linux_arm64/cdb -ldflags="-s -w" -v ./cdb-cli
-	@GOOS=linux GOARCH=amd64 go build -o build/linux_amd64/cdb -ldflags="-s -w" -v ./cdb-cli
+	@mkdir -p build/linux_$(GOARCH)
+	@go build -o build/linux_$(GOARCH)/cdb -ldflags="-s -w" -v ./cdb-cli
 
 $(VERSION_FILE):
 	@echo "package libcdb" > $(VERSION_FILE)
@@ -42,12 +46,8 @@ $(VERSION_FILE):
 
 cdbd: libcdb $(CDB_DAEMON_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-daaemon"
-	@mkdir -p build/linux_arm
-	@mkdir -p build/linux_arm64
-	@mkdir -p build/linux_amd64
-	@GOOS=linux GOARCH=arm   go build -o build/linux_arm/cdbd -ldflags="-s -w" ./cdb-daemon
-	@GOOS=linux GOARCH=arm64 go build -o build/linux_arm64/cdbd -ldflags="-s -w" ./cdb-daemon
-	@GOOS=linux GOARCH=amd64 go build -o build/linux_amd64/cdbd -ldflags="-s -w" ./cdb-daemon
+	@mkdir -p build/linux_$(GOARCH)
+	@go build -o build/linux_$(GOARCH)/cdbd -ldflags="-s -w" ./cdb-daemon
 
 libcdb: $(VERSION_FILE)
 	@echo "Building libcdb"
