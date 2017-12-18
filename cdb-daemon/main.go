@@ -4,9 +4,12 @@ import (
     "bufio"
     "io"
     "io/ioutil"
+//    "fmt"
     "log"
+    "os"
     "os/exec"
     "net/http"
+    "gopkg.in/gorilla/mux.v1"
 )
 
 func tar_rootfs(w http.ResponseWriter, r *http.Request) {
@@ -78,12 +81,48 @@ func tar_rootfs(w http.ResponseWriter, r *http.Request) {
 func info(w http.ResponseWriter, r *http.Request) {
 }
 
+func file(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    dest_path := "/" + vars["path"]
+    log.Println("r.URL.Path =", string(r.URL.Path), " dest_path:",dest_path," METHOD =",r.Method)
+
+    switch r.Method {
+        case "GET":
+            log.Println("GET HANDLER")
+                f, err := os.Open(dest_path)
+            if err != nil {
+                log.Println(err)
+                w.WriteHeader(http.StatusConflict)
+                return
+            }
+            defer f.Close()
+            io.Copy(w, f)
+        case "PUT":
+            log.Println("PUT HANDLER")
+            f, err := os.OpenFile(dest_path, os.O_WRONLY|os.O_CREATE, 0666)
+            if err != nil {
+                log.Println(err)
+                w.WriteHeader(http.StatusConflict)
+                return
+            }
+            defer f.Close()
+            io.Copy(f, r.Body)
+        default:
+            w.WriteHeader(http.StatusMethodNotAllowed)
+    }
+}
+
+
 func main() {
 
-    http.HandleFunc("/backup", tar_rootfs )
-    http.HandleFunc("/info", info )
+    log.Println("CDBD says hello\n\n")
 
-    if err:=http.ListenAndServe(":8080",nil); err!=nil {
+    r:=mux.NewRouter()
+    r.HandleFunc("/backup", tar_rootfs )
+    r.HandleFunc("/info", info )
+    r.HandleFunc("/file/{path:.*}", file )
+
+    if err:=http.ListenAndServe(":8080",r); err!=nil {
             log.Fatal("ListenAndServe:",err)
     }
 }
