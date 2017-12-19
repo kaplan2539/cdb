@@ -4,12 +4,14 @@ import (
     "bufio"
     "io"
     "io/ioutil"
-//    "fmt"
+    "path/filepath"
     "log"
     "os"
     "os/exec"
     "net/http"
     "gopkg.in/gorilla/mux.v1"
+    "strings"
+    "regexp"
 )
 
 func tar_rootfs(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +81,22 @@ func tar_rootfs(w http.ResponseWriter, r *http.Request) {
 }
 
 func info(w http.ResponseWriter, r *http.Request) {
+    root:="/dev/"
+
+    filepath.Walk(root, func (path string, info os.FileInfo, err error) error {
+        if info.IsDir() && strings.Compare(path,root)!=0 {
+            return filepath.SkipDir
+        }
+
+        if match,_ :=regexp.MatchString(".*mtd[0-9]+$",path); match==true {
+//        if match,_ :=filepath.Match("*",path); match==true {
+            log.Println("MATCH:",path)
+//        } else {
+//            log.Println(path)
+        }
+
+        return err
+    })
 }
 
 func file(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +141,7 @@ func main() {
     r.HandleFunc("/file/{path:.*}", file )
 
     if err:=http.ListenAndServe(":8080",r); err!=nil {
-            log.Fatal("ListenAndServe:",err)
+        log.Fatal("ListenAndServe:",err)
     }
+
 }

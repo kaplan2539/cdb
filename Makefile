@@ -23,15 +23,16 @@ CDB_DAEMON_SOURCES=$(shell ls cdb-daemon/*.go)
 LIBCDB_SOURCES=$(shell ls libcdb/*.go)
 
 DEPENDS=\
-	github.com/nextthingco/logrus-gadget-formatter
+	gopkg.in/gorilla/mux.v1
 
 ## Bottom two libs here^^ are essentially one-off code chunks which aren't
 ## likely to be updated. Neither has tags, and thus, gopkg.in links aren't
 ## being used.
 
 all: cdb cdbd
+	@echo "GOARCH=$(GOARCH)"
 
-cdb: libcdb $(CDB_CLI_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
+cdb: $(CDB_CLI_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-cli"
 	@mkdir -p build/linux_$(GOARCH)
 	@go build -o build/linux_$(GOARCH)/cdb -ldflags="-s -w" -v ./cdb-cli
@@ -46,7 +47,7 @@ $(VERSION_FILE):
 	@echo ")" >> $(VERSION_FILE)
 
 
-cdbd: libcdb $(CDB_DAEMON_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
+cdbd: $(CDB_DAEMON_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 	@echo "Building cdb-daaemon"
 	@mkdir -p build/linux_$(GOARCH)
 	@go build -o build/linux_$(GOARCH)/cdbd -ldflags="-s -w" ./cdb-daemon
@@ -54,6 +55,7 @@ cdbd: libcdb $(CDB_DAEMON_SOURCES) $(VERSION_FILE) $(LIBCDB_SOURCES)
 libcdb: $(VERSION_FILE)
 	@echo "Building libcdb"
 	@rm -rf ${GOPATH}/src/github.com/nextthingco/libcdb
+	@[ -d ${GOPATH}/src/github.com/nextthingco/ ] || mkdir -p ${GOPATH}/src/github.com/nextthingco/
 	@cp -r libcdb ${GOPATH}/src/github.com/nextthingco/
 	@go install -ldflags="-X libcdb.Version=$(VERSION) -X libcdb.GitCommit=$(GIT_COMMIT)" -v github.com/nextthingco/libcdb
 
