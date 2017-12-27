@@ -14,6 +14,8 @@ import (
 )
 
 var verbose = false
+var host = "192.168.81.1"
+var port = "8080"
 
 func push(local_path string, remote_path string) {
     if ! strings.HasPrefix(remote_path,"/") {
@@ -26,7 +28,7 @@ func push(local_path string, remote_path string) {
 	}
 	defer f.Close()
 
-    url := "http://192.168.81.1:8080/file"+remote_path
+    url := "http://"+host+":"+port+"/file"+remote_path
 
     fmt.Println("REMOVE ME: url =",url)
 
@@ -57,7 +59,7 @@ func pull(remote_path string, local_path string) {
 	}
 	defer f.Close()
 
-    url := "http://192.168.81.1:8080/file"+remote_path
+    url := "http://"+host+":"+port+"/file"+remote_path
 
 
 	res, err := http.Get(url)
@@ -92,7 +94,9 @@ func usage() {
 	fmt.Printf("Run '%s COMMAND --help' for more information on the command\n", filepath.Base(os.Args[0]))
 	fmt.Println("")
 	fmt.Println("Options:")
-	fmt.Println("  -v	Verbose execution")
+	fmt.Println("  -v	 Verbose execution")
+	fmt.Println("  -h <host> cdbd host")
+	fmt.Println("  -p <port> port")
 	fmt.Println("")
 }
 
@@ -100,6 +104,8 @@ func main() {
     //TODO: switch to urfave/cli for cmdline handling
 	flag.Usage=usage
 	flag.BoolVar(&verbose, "v", false, "Verbose execution")
+	flag.StringVar(&host, "h", "192.168.81.1", "cdbd host")
+	flag.StringVar(&host, "p", "8080", "Port")
 	flag.Parse()
 
 	args := flag.Args()
