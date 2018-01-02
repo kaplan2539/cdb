@@ -67,7 +67,15 @@ func mounted(mountpoint string) (bool, error) {
 	return mntpointSt.Dev != parentSt.Dev, nil
 }
 
+func tar_gz_rootfs(w http.ResponseWriter, r *http.Request) {
+    _tar_rootfs(w,r,[]string{"/bin/tar","cz","-C","/rootfs","--exclude=dev/*","--exclude=/var/cache/apt/*","."})
+}
+
 func tar_rootfs(w http.ResponseWriter, r *http.Request) {
+    _tar_rootfs(w,r,[]string{"/bin/tar","c","-C","/rootfs","--exclude=dev/*","--exclude=/var/cache/apt/*","."})
+}
+
+func _tar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
 
     /// TODO: determine NAND layout
     var mount_point="/rootfs"
@@ -107,7 +115,7 @@ func tar_rootfs(w http.ResponseWriter, r *http.Request) {
 
     /// Do not use the '-v' parameter with tar unless it is read out...
     /// Also: We need gnu tar!
-    cmd := exec.Command("/bin/tar","cz","-C","/rootfs","--exclude=dev/*","--exclude=/var/cache/apt/*",".")
+    cmd := exec.Command(tar_cmd[0],tar_cmd[1:]...)
     stdout,err := cmd.StdoutPipe()
     if err != nil {
         log.Println(err.Error())
@@ -277,6 +285,7 @@ func main() {
 
     r:=mux.NewRouter()
     r.HandleFunc("/backup", tar_rootfs )
+    r.HandleFunc("/zbackup", tar_gz_rootfs )
     r.HandleFunc("/info", info )
     r.HandleFunc("/file/{path:.*}", file )
 
