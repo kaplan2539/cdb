@@ -212,13 +212,13 @@ func info(w http.ResponseWriter, r *http.Request) {
             var mtd MTD
             mtd.Path="/dev/"+path.Base(p)
             if dat, err := ioutil.ReadFile(p+"/dev"); err==nil {
-               mtd.Dev=string(dat)
+               mtd.Dev=strings.TrimSuffix(string(dat),"\n")
             }
             if dat, err := ioutil.ReadFile(p+"/type"); err==nil {
-               mtd.Type=string(dat)
+               mtd.Type=strings.TrimSuffix(string(dat),"\n")
             }
             if dat, err := ioutil.ReadFile(p+"/name"); err==nil {
-               mtd.Name=string(dat)
+               mtd.Name=strings.TrimSuffix(string(dat),"\n")
             }
             if dat, err := ioutil.ReadFile(p+"/offset"); err==nil {
                mtd.Offset,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
