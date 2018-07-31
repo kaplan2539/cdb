@@ -14,7 +14,7 @@ import (
     "regexp"
     "syscall"
     "strconv"
-    "path"
+//    "path"
     "encoding/json"
 )
 
@@ -200,7 +200,7 @@ func _tar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
 func info(w http.ResponseWriter, r *http.Request) {
     root:="/sys/class/mtd"
 
-    var mtds []MTD
+    var mtds []*MTD
     filepath.Walk(root, func (p string, info os.FileInfo, err error) error {
         if info.IsDir() && strings.Compare(p,root)!=0 {
             return filepath.SkipDir
@@ -209,35 +209,7 @@ func info(w http.ResponseWriter, r *http.Request) {
         if match,_ :=regexp.MatchString(".*mtd[0-9]+$",p); match==true {
             log.Println("MATCH:",p)
 
-            var mtd MTD
-            mtd.Path="/dev/"+path.Base(p)
-            if dat, err := ioutil.ReadFile(p+"/dev"); err==nil {
-               mtd.Dev=strings.TrimSuffix(string(dat),"\n")
-            }
-            if dat, err := ioutil.ReadFile(p+"/type"); err==nil {
-               mtd.Type=strings.TrimSuffix(string(dat),"\n")
-            }
-            if dat, err := ioutil.ReadFile(p+"/name"); err==nil {
-               mtd.Name=strings.TrimSuffix(string(dat),"\n")
-            }
-            if dat, err := ioutil.ReadFile(p+"/offset"); err==nil {
-               mtd.Offset,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
-            if dat, err := ioutil.ReadFile(p+"/size"); err==nil {
-               mtd.Size,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
-            if dat, err := ioutil.ReadFile(p+"/erasesize"); err==nil {
-               mtd.EraseSize,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
-            if dat, err := ioutil.ReadFile(p+"/oobsize"); err==nil {
-               mtd.OobSize,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
-            if dat, err := ioutil.ReadFile(p+"/subpagesize"); err==nil {
-               mtd.SubPageSize,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
-            if dat, err := ioutil.ReadFile(p+"/writesize"); err==nil {
-               mtd.WriteSize,_=strconv.ParseUint(strings.TrimSuffix(string(dat),"\n"),10,64)
-            }
+            mtd := FromSysFs(p)
 
             log.Println("mtd",mtd)
             mtds = append(mtds,mtd)
