@@ -20,9 +20,15 @@ import (
 
 var executable_path = "bla"
 
-func ubi_attach(mtd_device int) error {
-    log.Println("RUNNING: ubiattach -m"+strconv.Itoa(mtd_device))
-    cmd := exec.Command("ubiattach","-m"+strconv.Itoa(mtd_device))
+/// TODO: determine NAND layout
+var mount_point="/rootfs"
+var mtd_device=4
+var ubi_vol="/dev/ubi0_0"
+var ubi_dev="/dev/ubi0"
+
+func run_cmd(name string, args ...string) error {
+    log.Println("RUNNING: "+name+" "+strings.Join(args," "))
+    cmd := exec.Command(name,args...)
     stderr,err := cmd.StderrPipe()
     if err != nil {
         log.Fatal(err)
@@ -40,6 +46,69 @@ func ubi_attach(mtd_device int) error {
         log.Fatal(err.Error())
         return err
     }
+    return nil
+}
+
+func ubi_detach(mtd_device int) error {
+    return run_cmd("ubidetach","-m"+strconv.Itoa(mtd_device))
+}
+
+
+func ubi_attach(mtd_device int) error {
+    return run_cmd("ubiattach","-m"+strconv.Itoa(mtd_device))
+//    log.Println("RUNNING: ubiattach -m"+strconv.Itoa(mtd_device))
+//    cmd := exec.Command("ubiattach","-m"+strconv.Itoa(mtd_device))
+//    stderr,err := cmd.StderrPipe()
+//    if err != nil {
+//        log.Fatal(err)
+//        return err
+//    }
+//    if err:=cmd.Start(); err != nil {
+//        slurp, _ := ioutil.ReadAll(stderr)
+//        log.Printf("%s\n", slurp)
+//        log.Printf(err.Error())
+//        return err
+//    }
+//    if err:=cmd.Wait(); err != nil {
+//        slurp, _ := ioutil.ReadAll(stderr)
+//        log.Printf("stderr=%s\n", slurp)
+//        log.Fatal(err.Error())
+//        return err
+//    }
+//    return nil
+}
+
+func create_ubi() error {
+    // Write ubi.cfg
+    ubi_cfg := []byte(`
+[rootfs]
+mode=ubi
+vol_id=0
+vol_size=7168MiB
+vol_type=dynamic
+vol_name=rootfs
+vol_alignment=1
+`)
+    if err := ioutil.WriteFile("/tmp/ubi.cfg", ubi_cfg, 0644); err != nil {
+            log.Printf("create_ubi(): error writing /tmp/ubi.cfg");
+            return err
+    }
+
+    // Run ubinize
+    if err := run_cmd("ubinize","-o","/tmp/ubi.bin","-p","0x400000","-m","0x4000","-s","0x4000","-M","dist3","/tmp/ubi.cfg"); err != nil {
+        return err
+    }
+
+     // Run flash_erase
+    if err := run_cmd("flash_erase","/dev/mtd4","0","2044"); err != nil {
+        return err
+    }
+
+    // Run nand_write
+    if err := run_cmd("nandwrite","-m","-p","/dev/mtd4","/tmp/ubi.bin"); err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -69,6 +138,96 @@ func mounted(mountpoint string) (bool, error) {
 	return mntpointSt.Dev != parentSt.Dev, nil
 }
 
+func run(w http.ResponseWriter, r *http.Request) {
+
+    cmd_string := r.FormValue("cmd")
+    args := strings.Split(cmd_string," ")
+
+    log.Println("cmd="+cmd_string)
+    log.Println("args="+strings.Join(args," "))
+
+    /// Do not use the '-v' parameter with tar unless it is read out...
+    /// Also: We need gnu tar!
+    cmd := exec.Command(args[0],args[1:]...)
+    stdout,err := cmd.StdoutPipe()
+    if err != nil {
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    /// if tar -v is used this has to be read out!!!!!
+    stderr,err := cmd.StderrPipe()
+    if err != nil {
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    if err:=cmd.Start(); err != nil {
+        slurp, _ := ioutil.ReadAll(stderr)
+        log.Printf("%s\n", slurp)
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    nBytes, nChunks := int64(0), int64(0)
+    reader := bufio.NewReader(stdout)
+    buf := make([]byte, 0, 4*1024*1024)
+    for {
+        log.Println("reading...")
+        n, err := reader.Read(buf[:cap(buf)])
+        buf = buf[:n]
+        if n == 0 {
+            if err == nil {
+                log.Println("got zero bytes --> continue")
+                continue
+            }
+            if err == io.EOF {
+                break
+            }
+            slurp, _ := ioutil.ReadAll(stderr)
+            log.Printf("%s\n", slurp)
+            log.Println(err.Error())
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+        nChunks++
+        nBytes += int64(len(buf))
+        log.Println("got: ",nBytes)
+
+        if err != nil && err != io.EOF {
+            slurp, _ := ioutil.ReadAll(stderr)
+            log.Printf("%s\n", slurp)
+            log.Println(err.Error())
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+
+        nWritten, werr := w.Write(buf)
+        if werr != nil || nWritten != len(buf) {
+            log.Printf("nWritten = %d\nlen(buf) = %d", nWritten, len(buf))
+            log.Println(werr)
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+
+//        log.Println("got: [",string(buf[:]),"]")
+    }
+    if err:=cmd.Wait(); err != nil {
+        slurp, _ := ioutil.ReadAll(stderr)
+        log.Println("hellau")
+        log.Printf("stderr=%s\n", slurp)
+        log.Println(err.Error())
+        slurp2, _ := ioutil.ReadAll(stdout)
+        log.Printf("%s\n", slurp2)
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+    log.Println("Bytes:", nBytes, "Chunks:", nChunks)
+}
+
 func tar_gz_rootfs(w http.ResponseWriter, r *http.Request) {
     _tar_rootfs(w,r,[]string{"/bin/tar","cz","-C","/rootfs","--exclude=dev/*","--exclude=/var/cache/apt/*","."})
 }
@@ -77,14 +236,13 @@ func tar_rootfs(w http.ResponseWriter, r *http.Request) {
     _tar_rootfs(w,r,[]string{"/bin/tar","c","-C","/rootfs","--exclude=dev/*","--exclude=/var/cache/apt/*","."})
 }
 
+func untar_rootfs(w http.ResponseWriter, r *http.Request) {
+    _untar_rootfs(w,r,[]string{"/bin/tar","x","-C","/rootfs"})
+}
+
 func _tar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
 
-    /// TODO: determine NAND layout
-    var mount_point="/rootfs"
-    var mtd_device=4
-    var ubi_vol="/dev/ubi0_0"
-
-    if ! exists("/dev/ubi0") {
+    if ! exists(ubi_dev) {
         log.Println("Attach UBI volume")
         if err:=ubi_attach(mtd_device); err!=nil {
             log.Printf(err.Error())
@@ -197,6 +355,149 @@ func _tar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
     log.Println("Bytes:", nBytes, "Chunks:", nChunks)
 }
 
+func _untar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
+
+    if r.Method != "PUT"  {
+        msg := "ERROR: "+r.URL.Path + " does only accept PUT requests sorry\n\n"
+        w.WriteHeader(http.StatusConflict)
+        w.Write([]byte(msg))
+        return
+    }
+
+    if ! exists(mount_point) {
+        log.Println("Create mount point")
+        if err:=os.Mkdir(mount_point,0666); err!=nil {
+            log.Printf(err.Error())
+            w.WriteHeader(http.StatusConflict)
+            return
+        }
+    }
+
+	if is_mounted,err:=mounted(mount_point); err != nil && is_mounted {
+		log.Println("Unmounting ubifs")
+		if err:=syscall.Unmount(mount_point,0); err!=nil {
+			log.Printf(err.Error())
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+	}
+
+    if exists(ubi_dev) {
+        log.Println("Detach UBI volume")
+        if err:=ubi_detach(mtd_device); err!=nil {
+            log.Printf(err.Error())
+            w.WriteHeader(http.StatusConflict)
+            return
+        }
+    }
+
+    if err:=create_ubi(); err !=nil {
+            log.Printf(err.Error())
+            w.WriteHeader(http.StatusConflict)
+            return
+     }
+
+    log.Println("Attaching ubi")
+    if err:=ubi_attach(mtd_device); err!=nil {
+        log.Printf(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+     log.Println("Mounting ubifs")
+     if err:=syscall.Mount(ubi_vol,mount_point,"ubifs",syscall.MS_SYNC,""); err!=nil {
+         log.Printf(err.Error())
+         w.WriteHeader(http.StatusConflict)
+         return
+     }
+
+    /// Do not use the '-v' parameter with tar unless it is read out...
+    /// Also: We need gnu tar!
+    log.Println("creating stdin pipe")
+    cmd := exec.Command(tar_cmd[0],tar_cmd[1:]...)
+    stdin,err := cmd.StdinPipe()
+    if err != nil {
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    log.Println("creating stderr pipe")
+    /// if tar -v is used this has to be read out!!!!!
+    stderr,err := cmd.StderrPipe()
+    if err != nil {
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    log.Println("exec tar")
+    if err:=cmd.Start(); err != nil {
+        slurp, _ := ioutil.ReadAll(stderr)
+        log.Printf("%s\n", slurp)
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    nBytes, nChunks := int64(0), int64(0)
+    writer := bufio.NewWriter(stdin)
+
+    log.Println("start streaming...")
+
+    buf := make([]byte, 0, 4*1024*1024)
+    for {
+        log.Println("reading...")
+        n, err := r.Body.Read(buf[:cap(buf)])
+        buf = buf[:n]
+        if n == 0 {
+            if err == nil {
+                log.Println("got zero bytes --> continue")
+                continue
+            }
+            if err == io.EOF {
+                log.Println("EOF -> break")
+                break
+            }
+            slurp, _ := ioutil.ReadAll(stderr)
+            log.Printf("%s\n", slurp)
+            log.Println(err.Error())
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+        nChunks++
+        nBytes += int64(len(buf))
+        log.Println("got: ",nBytes)
+
+        if err != nil && err != io.EOF {
+            slurp, _ := ioutil.ReadAll(stderr)
+            log.Printf("%s\n", slurp)
+            log.Println(err.Error())
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+
+        nWritten, werr := writer.Write(buf)
+        if werr != nil || nWritten != len(buf) {
+            log.Printf("nWritten = %d\nlen(buf) = %d", nWritten, len(buf))
+            log.Println(werr)
+			w.WriteHeader(http.StatusConflict)
+            return
+        }
+
+        //log.Println("got: [",string(buf[:]),"]")
+    }
+    if err:=cmd.Wait(); err != nil {
+        slurp, _ := ioutil.ReadAll(stderr)
+        log.Println("hellau")
+        log.Printf("stderr=%s\n", slurp)
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
+       return
+    }
+    log.Println("Bytes:", nBytes, "Chunks:", nChunks)
+}
+
 func info(w http.ResponseWriter, r *http.Request) {
     root:="/sys/class/mtd"
 
@@ -291,8 +592,10 @@ func main() {
 
     r:=mux.NewRouter()
     r.HandleFunc("/backup", tar_rootfs )
+    r.HandleFunc("/restore", untar_rootfs )
     r.HandleFunc("/zbackup", tar_gz_rootfs )
     r.HandleFunc("/info", info )
+    r.HandleFunc("/run", run )
     r.HandleFunc("/file/{path:.*}", file )
 
     if err:=http.ListenAndServe(":8080",r); err!=nil {
