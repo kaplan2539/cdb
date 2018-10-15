@@ -56,26 +56,6 @@ func ubi_detach(mtd_device int) error {
 
 func ubi_attach(mtd_device int) error {
     return run_cmd("ubiattach","-m"+strconv.Itoa(mtd_device))
-//    log.Println("RUNNING: ubiattach -m"+strconv.Itoa(mtd_device))
-//    cmd := exec.Command("ubiattach","-m"+strconv.Itoa(mtd_device))
-//    stderr,err := cmd.StderrPipe()
-//    if err != nil {
-//        log.Fatal(err)
-//        return err
-//    }
-//    if err:=cmd.Start(); err != nil {
-//        slurp, _ := ioutil.ReadAll(stderr)
-//        log.Printf("%s\n", slurp)
-//        log.Printf(err.Error())
-//        return err
-//    }
-//    if err:=cmd.Wait(); err != nil {
-//        slurp, _ := ioutil.ReadAll(stderr)
-//        log.Printf("stderr=%s\n", slurp)
-//        log.Fatal(err.Error())
-//        return err
-//    }
-//    return nil
 }
 
 func create_ubi() error {
@@ -174,47 +154,50 @@ func run(w http.ResponseWriter, r *http.Request) {
 
     nBytes, nChunks := int64(0), int64(0)
     reader := bufio.NewReader(stdout)
-    buf := make([]byte, 0, 4*1024*1024)
-    for {
-        log.Println("reading...")
-        n, err := reader.Read(buf[:cap(buf)])
-        buf = buf[:n]
-        if n == 0 {
-            if err == nil {
-                log.Println("got zero bytes --> continue")
-                continue
-            }
-            if err == io.EOF {
-                break
-            }
-            slurp, _ := ioutil.ReadAll(stderr)
-            log.Printf("%s\n", slurp)
-            log.Println(err.Error())
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
-        nChunks++
-        nBytes += int64(len(buf))
-        log.Println("got: ",nBytes)
 
-        if err != nil && err != io.EOF {
-            slurp, _ := ioutil.ReadAll(stderr)
-            log.Printf("%s\n", slurp)
-            log.Println(err.Error())
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
+    io.Copy(w,reader)
 
-        nWritten, werr := w.Write(buf)
-        if werr != nil || nWritten != len(buf) {
-            log.Printf("nWritten = %d\nlen(buf) = %d", nWritten, len(buf))
-            log.Println(werr)
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
-
-//        log.Println("got: [",string(buf[:]),"]")
-    }
+//    buf := make([]byte, 0, 4*1024*1024)
+//    for {
+//        log.Println("reading...")
+//        n, err := reader.Read(buf[:cap(buf)])
+//        buf = buf[:n]
+//        if n == 0 {
+//            if err == nil {
+//                log.Println("got zero bytes --> continue")
+//                continue
+//            }
+//            if err == io.EOF {
+//                break
+//            }
+//            slurp, _ := ioutil.ReadAll(stderr)
+//            log.Printf("%s\n", slurp)
+//            log.Println(err.Error())
+//			w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//        nChunks++
+//        nBytes += int64(len(buf))
+//        log.Println("got: ",nBytes)
+//
+//        if err != nil && err != io.EOF {
+//            slurp, _ := ioutil.ReadAll(stderr)
+//            log.Printf("%s\n", slurp)
+//            log.Println(err.Error())
+//			w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//
+//        nWritten, werr := w.Write(buf)
+//        if werr != nil || nWritten != len(buf) {
+//            log.Printf("nWritten = %d\nlen(buf) = %d", nWritten, len(buf))
+//            log.Println(werr)
+//			w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//
+////        log.Println("got: [",string(buf[:]),"]")
+//    }
     if err:=cmd.Wait(); err != nil {
         slurp, _ := ioutil.ReadAll(stderr)
         log.Println("hellau")
@@ -445,57 +428,37 @@ func _untar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
 
     log.Println("start streaming...")
 
-    buf := make([]byte, 0, 4*1024*1024)
-    for {
-        log.Println("reading...")
-        n, err := r.Body.Read(buf[:cap(buf)])
-        buf = buf[:n]
-        if n == 0 {
-            if err == nil {
-                log.Println("got zero bytes --> continue")
-                continue
-            }
-            if err == io.EOF {
-                log.Println("EOF -> break")
-                break
-            }
-            slurp, _ := ioutil.ReadAll(stderr)
-            log.Printf("%s\n", slurp)
-            log.Println(err.Error())
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
-        nChunks++
-        nBytes += int64(len(buf))
-        log.Println("got: ",nBytes)
-
-        if err != nil && err != io.EOF {
-            slurp, _ := ioutil.ReadAll(stderr)
-            log.Printf("%s\n", slurp)
-            log.Println(err.Error())
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
-
-        nWritten, werr := writer.Write(buf)
-        if werr != nil || nWritten != len(buf) {
-            log.Printf("nWritten = %d\nlen(buf) = %d", nWritten, len(buf))
-            log.Println(werr)
-			w.WriteHeader(http.StatusConflict)
-            return
-        }
-
-        //log.Println("got: [",string(buf[:]),"]")
+    if _, err := io.Copy(writer,r.Body); err != nil {
+        log.Println(err.Error())
+        w.WriteHeader(http.StatusConflict)
     }
+
+    writer.Flush()
+    stdin.Close()
+
     if err:=cmd.Wait(); err != nil {
         slurp, _ := ioutil.ReadAll(stderr)
-        log.Println("hellau")
         log.Printf("stderr=%s\n", slurp)
         log.Println(err.Error())
         w.WriteHeader(http.StatusConflict)
-       return
+        return
     }
     log.Println("Bytes:", nBytes, "Chunks:", nChunks)
+
+    log.Println("Unmounting ubifs")
+    if err:=syscall.Unmount(mount_point,0); err!=nil {
+        log.Printf(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+    log.Println("Detach UBI volume")
+    if err:=ubi_detach(mtd_device); err!=nil {
+        log.Printf(err.Error())
+        w.WriteHeader(http.StatusConflict)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
 }
 
 func info(w http.ResponseWriter, r *http.Request) {
