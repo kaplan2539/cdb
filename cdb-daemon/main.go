@@ -479,9 +479,9 @@ func info(w http.ResponseWriter, r *http.Request) {
             mtds = append(mtds,mtd)
         }
 
-        json.NewEncoder(w).Encode(mtds)
         return err
     })
+    json.NewEncoder(w).Encode(mtds)
 }
 
 func file(w http.ResponseWriter, r *http.Request) {
