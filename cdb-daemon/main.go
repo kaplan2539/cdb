@@ -58,6 +58,7 @@ func ubi_attach(mtd_device int) error {
     return run_cmd("ubiattach","-m"+strconv.Itoa(mtd_device))
 }
 
+//TODO: vol_size needs to match NAND size! (get from info json)
 func create_ubi() error {
     // Write ubi.cfg
     ubi_cfg := []byte(`
@@ -75,6 +76,7 @@ vol_alignment=1
     }
 
     // Run ubinize
+    // TODO: currently parameters for Hynix 8GB NAND are hard-coded, use info from json for this!
     if err := run_cmd("ubinize","-o","/tmp/ubi.bin","-p","0x400000","-m","0x4000","-s","0x4000","-M","dist3","/tmp/ubi.cfg"); err != nil {
         return err
     }
@@ -225,36 +227,36 @@ func untar_rootfs(w http.ResponseWriter, r *http.Request) {
 
 func _tar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
 
-    if ! exists(ubi_dev) {
-        log.Println("Attach UBI volume")
-        if err:=ubi_attach(mtd_device); err!=nil {
-            log.Printf(err.Error())
-            w.WriteHeader(http.StatusConflict)
-            return
-        }
-    }
-
-    if ! exists(mount_point) {
-        log.Println("Create mount point")
-        if err:=os.Mkdir(mount_point,0666); err!=nil {
-            log.Printf(err.Error())
-            w.WriteHeader(http.StatusConflict)
-            return
-        }
-    }
-
-	if is_mounted,err:=mounted(mount_point); err != nil {
-        log.Printf(err.Error())
-        w.WriteHeader(http.StatusConflict)
-        return
-	} else if !is_mounted {
-		log.Println("Mounting ubifs")
-		if err:=syscall.Mount(ubi_vol,mount_point,"ubifs",syscall.MS_RDONLY,""); err!=nil {
-			log.Printf(err.Error())
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-	}
+//    if ! exists(ubi_dev) {
+//        log.Println("Attach UBI volume")
+//        if err:=ubi_attach(mtd_device); err!=nil {
+//            log.Printf(err.Error())
+//            w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//    }
+//
+//    if ! exists(mount_point) {
+//        log.Println("Create mount point")
+//        if err:=os.Mkdir(mount_point,0666); err!=nil {
+//            log.Printf(err.Error())
+//            w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//    }
+//
+//	if is_mounted,err:=mounted(mount_point); err != nil {
+//        log.Printf(err.Error())
+//        w.WriteHeader(http.StatusConflict)
+//        return
+//	} else if !is_mounted {
+//		log.Println("Mounting ubifs")
+//		if err:=syscall.Mount(ubi_vol,mount_point,"ubifs",syscall.MS_RDONLY,""); err!=nil {
+//			log.Printf(err.Error())
+//			w.WriteHeader(http.StatusConflict)
+//			return
+//		}
+//	}
 
     /// Do not use the '-v' parameter with tar unless it is read out...
     /// Also: We need gnu tar!
@@ -347,52 +349,52 @@ func _untar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
         return
     }
 
-    if ! exists(mount_point) {
-        log.Println("Create mount point")
-        if err:=os.Mkdir(mount_point,0666); err!=nil {
-            log.Printf(err.Error())
-            w.WriteHeader(http.StatusConflict)
-            return
-        }
-    }
-
-	if is_mounted,err:=mounted(mount_point); err != nil && is_mounted {
-		log.Println("Unmounting ubifs")
-		if err:=syscall.Unmount(mount_point,0); err!=nil {
-			log.Printf(err.Error())
-			w.WriteHeader(http.StatusConflict)
-			return
-		}
-	}
-
-    if exists(ubi_dev) {
-        log.Println("Detach UBI volume")
-        if err:=ubi_detach(mtd_device); err!=nil {
-            log.Printf(err.Error())
-            w.WriteHeader(http.StatusConflict)
-            return
-        }
-    }
-
-    if err:=create_ubi(); err !=nil {
-            log.Printf(err.Error())
-            w.WriteHeader(http.StatusConflict)
-            return
-     }
-
-    log.Println("Attaching ubi")
-    if err:=ubi_attach(mtd_device); err!=nil {
-        log.Printf(err.Error())
-        w.WriteHeader(http.StatusConflict)
-        return
-    }
-
-     log.Println("Mounting ubifs")
-     if err:=syscall.Mount(ubi_vol,mount_point,"ubifs",syscall.MS_SYNC,""); err!=nil {
-         log.Printf(err.Error())
-         w.WriteHeader(http.StatusConflict)
-         return
-     }
+//    if ! exists(mount_point) {
+//        log.Println("Create mount point")
+//        if err:=os.Mkdir(mount_point,0666); err!=nil {
+//            log.Printf(err.Error())
+//            w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//    }
+//
+//	if is_mounted,err:=mounted(mount_point); err != nil && is_mounted {
+//		log.Println("Unmounting ubifs")
+//		if err:=syscall.Unmount(mount_point,0); err!=nil {
+//			log.Printf(err.Error())
+//			w.WriteHeader(http.StatusConflict)
+//			return
+//		}
+//	}
+//
+//    if exists(ubi_dev) {
+//        log.Println("Detach UBI volume")
+//        if err:=ubi_detach(mtd_device); err!=nil {
+//            log.Printf(err.Error())
+//            w.WriteHeader(http.StatusConflict)
+//            return
+//        }
+//    }
+//
+//    if err:=create_ubi(); err !=nil {
+//            log.Printf(err.Error())
+//            w.WriteHeader(http.StatusConflict)
+//            return
+//     }
+//
+//    log.Println("Attaching ubi")
+//    if err:=ubi_attach(mtd_device); err!=nil {
+//        log.Printf(err.Error())
+//        w.WriteHeader(http.StatusConflict)
+//        return
+//    }
+//
+//     log.Println("Mounting ubifs")
+//     if err:=syscall.Mount(ubi_vol,mount_point,"ubifs",syscall.MS_SYNC,""); err!=nil {
+//         log.Printf(err.Error())
+//         w.WriteHeader(http.StatusConflict)
+//         return
+//     }
 
     /// Do not use the '-v' parameter with tar unless it is read out...
     /// Also: We need gnu tar!
@@ -445,18 +447,18 @@ func _untar_rootfs(w http.ResponseWriter, r *http.Request, tar_cmd []string) {
     }
     log.Println("Bytes:", nBytes, "Chunks:", nChunks)
 
-    log.Println("Unmounting ubifs")
-    if err:=syscall.Unmount(mount_point,0); err!=nil {
-        log.Printf(err.Error())
-        w.WriteHeader(http.StatusConflict)
-        return
-    }
-    log.Println("Detach UBI volume")
-    if err:=ubi_detach(mtd_device); err!=nil {
-        log.Printf(err.Error())
-        w.WriteHeader(http.StatusConflict)
-        return
-    }
+//    log.Println("Unmounting ubifs")
+//    if err:=syscall.Unmount(mount_point,0); err!=nil {
+//        log.Printf(err.Error())
+//        w.WriteHeader(http.StatusConflict)
+//        return
+//    }
+//    log.Println("Detach UBI volume")
+//    if err:=ubi_detach(mtd_device); err!=nil {
+//        log.Printf(err.Error())
+//        w.WriteHeader(http.StatusConflict)
+//        return
+//    }
 
     w.WriteHeader(http.StatusOK)
 }
